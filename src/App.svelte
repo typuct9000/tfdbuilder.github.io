@@ -1,10 +1,18 @@
 <script lang="ts">
+    import { CommonEffects } from "./Effects";
 	import { getModuleData, type Module } from "./ModData";
     import ModCard from "./lib/ModCard.svelte";
 
 	const modulesPromise = getModuleData();
-	modulesPromise.then(() => initFromBuildCode(window.location.search.slice(1)));
-	modulesPromise.then((m) => console.log(m.length));
+	modulesPromise.then(init);
+
+	let isLoaded = false;
+
+	function init()
+	{
+		isLoaded = true;
+		initFromBuildCode(window.location.search.slice(1));
+	}
 
 	enum ModFlags
 	{
@@ -36,10 +44,13 @@
 			});
 	}
 
-	// function updateUrl()
-	// {
-	// 	window.history.pushState(null, '', window.location.origin + window.location.pathname + `?${buildCode}`);
-	// }
+	function updateUrl()
+	{
+		if (isLoaded)
+		{
+			window.history.replaceState(null, '', `?${buildCode}`);
+		}
+	}
 
 	function selectMod(module: Module)
 	{
@@ -47,6 +58,11 @@
 		{
 			selected = [...selected, { module, level: getMaxLevel(module), flags: ModFlags.None }];
 		}
+	}
+
+	function unselectMod(module: Module)
+	{
+		selected = selected.filter((m) => m.module.module_id !== module.module_id);
 	}
 
 	async function handleDragDrop(e: DragEvent)
@@ -98,14 +114,18 @@
 
 	function filterModules(modules: Module[])
 	{
-		console.log($state.snapshot(filter));
+		let textFilter: RegExp | null = null;
+		if (filter.text !== "")
+		{
+			try { textFilter = new RegExp(filter.text, "i"); } catch (err) {}
+		}
+
 		const after = modules.filter((m) =>
-			(filter.text === "" || m.module_name.includes(filter.text) || m.module_stat[0]?.value.includes(filter.text)) &&
+			(!textFilter || textFilter.test(m.module_name) || textFilter.test(m.module_stat.at(-1)?.value ?? "")) &&
 			(filter.class === "" || m.module_class === filter.class) &&
 			(filter.tier === "" || m.module_tier === filter.tier) &&
 			(filter.type === "" || m.module_type === filter.type) &&
 			(filter.socket === "" || m.module_socket_type === filter.socket));
-		console.log({ before: modules.length, after: after.length });
 		return after;
 	}
 
@@ -116,8 +136,52 @@
 		return options;
 	}
 
+	function getStats()
+	{
+		const result = new Map<string, string[]>();
+		for (const mod of selected)
+		{
+			const description = mod.module.module_stat[mod.level]?.value;
+			if (description)
+			{
+				const effects = parseModDescription(description);
+				for (const effect of Object.keys(effects))
+				{
+					if (CommonEffects.includes(effect))
+					{
+						result.set(effect, [...result.get(effect) ?? [], effects[effect]!]);
+					}
+					else
+					{
+						result.set(description, []);
+					}
+				}
+			}
+		}
+
+		return result;
+	}
+
+	function parseModDescription(description: string)
+	{
+		const result = {} as Record<string, string>;
+
+		const regex = /([A-Za-z\-.,;'"()& ]+) ([+\-0-9.%]+),?\s*/g;
+		for (const [_, key, value] of description.matchAll(regex))
+		{
+			if (key && value)
+			{
+				result[key] = value;
+			}
+		}
+
+		return result;
+	}
+
 	const usedCapacity = $derived(selected.reduce((value, mod) => value + (mod.module.module_stat[mod.level]?.module_capacity ?? 0), 0));
 	const buildCode = $derived(selected.map((m) => `${m.module.module_id}:${m.level}:${m.flags}`).join(","));
+
+	$effect(updateUrl);
 
 </script>
 
@@ -125,14 +189,27 @@
 
 	<div><a href="{window.location.pathname + "?" + buildCode}">Build link</a> Used capacity: {usedCapacity}</div>
 
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div style="width: 1020px; height: 550px; border: solid 1px black; display: flex; flex-wrap: wrap; gap: 10px; overflow: scroll" ondrop={handleDragDrop} ondragover={handleDragOver}>
-		{#each selected as mod, i (mod.module.module_id)}
-			{#if mod.module}
-				<ModCard showButtons={true} mod={mod.module} bind:level={mod.level} 
-					oncontextmenu={(e) => { e.preventDefault(); selected = selected.filter((m) => m.module.module_id !== mod.module.module_id); }} />
-			{/if}
-		{/each}
+	<div style="display: flex; justify-content: space-between; align-items: flex-start;">
+
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div style="flex: 5; width: 1020px; height: 550px; border: solid 1px black; display: flex; flex-wrap: wrap; gap: 10px; overflow: scroll" ondrop={handleDragDrop} ondragover={handleDragOver}>
+			{#each selected as mod, i (mod.module.module_id)}
+				{#if mod.module}
+					<ModCard showButtons={true} mod={mod.module} bind:level={mod.level}
+						ondblclick={(e) => { e.preventDefault(); unselectMod(mod.module); }}
+						oncontextmenu={(e) => { e.preventDefault(); unselectMod(mod.module); }} />
+				{/if}
+			{/each}
+		</div>
+
+		<div style="flex: 2">
+			<ul>
+				{#each getStats() as item}
+					<li>{item}</li>
+				{/each}
+			</ul>
+		</div>
+
 	</div>
 
 	{#await modulesPromise}
@@ -140,7 +217,7 @@
 	{:then modules}
 		{@const filtered = filterModules(modules)}
 		<div style="display: flex; flex-wrap: wrap; gap: 10px;">
-			<input type="search" bind:value={filter.text} />
+			<input type="search" placeholder="Search" bind:value={filter.text} />
 			<select bind:value={filter.class}>
 				<option value="">Class</option>
 				{#each getFilterOptions(modules, "module_class") as option}
@@ -165,8 +242,8 @@
 					<option>{option}</option>
 				{/each}
 			</select>
+			<div>Showing {filtered.length}</div>
 		</div>
-		<div>Showing {filtered.length}</div>
 		<div style="display: flex; flex-wrap: wrap; gap: 10px">
 			{#each filtered as mod}
 				<ModCard {mod} level={100} ondblclick={() => selectMod(mod)} />

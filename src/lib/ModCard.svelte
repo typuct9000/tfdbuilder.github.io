@@ -100,6 +100,7 @@
 	{
 		font-size: medium;
 		font-weight: bold;
+		text-shadow: 1px 1px #333333;
 		padding: 0 5px 5px 5px;
 	}
 
