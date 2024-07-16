@@ -1,12 +1,9 @@
 <script lang="ts">
-	import type { Module } from "../ModData";
+	import { getModuleDrain, type Module } from "../ModData";
 
-	type Props = { mod: Module, level?: number, matchingSocket?: boolean, showButtons?: boolean, ondblclick?: (e: MouseEvent) => void, oncontextmenu?: (e: MouseEvent) => void};
+	type Props = { mod: Module, level?: number, matchingSocket?: boolean, interactive?: boolean, ondblclick?: (e: MouseEvent) => void, oncontextmenu?: (e: MouseEvent) => void};
 
-	let { mod, level = $bindable(0), matchingSocket = false, showButtons = false, ondblclick, oncontextmenu }: Props = $props();
-
-	const maxLevel = mod.module_stat.at(-1)?.level ?? 0;
-	level = Math.max(0, Math.min(level, maxLevel));
+	let { mod, level = $bindable(mod.module_stat.at(-1)?.level ?? 0), matchingSocket = $bindable(false), interactive = false, ondblclick, oncontextmenu }: Props = $props();
 
 	const colors: Record<string, string[]> = 
 	{
@@ -25,6 +22,9 @@
 	{
 		return colors[mod.module_tier]?.[0] ?? "white";
 	}
+
+
+	const maxLevel = mod.module_stat.at(-1)?.level ?? 0;
 
 	function increase(e: MouseEvent)
 	{
@@ -56,6 +56,7 @@
 		}
 	}
 
+
 	function handleDragStart(e: DragEvent)
 	{
 		if (e.dataTransfer)
@@ -65,22 +66,33 @@
 		}
 	}
 
+	function toggleMatching()
+	{
+		if (interactive)
+		{
+			matchingSocket = !matchingSocket;
+		}
+	}
+
 	function nothing(e: Event)
 	{
-		e.preventDefault();
-		e.stopPropagation();
+		if (interactive)
+		{
+			e.preventDefault();
+			e.stopPropagation();
+		}
 	}
 
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="modcard" style="background-color: {getBackgroundColor()}; border-color: {getBorderColor()}; " draggable="true" ondragstart={handleDragStart} ondblclick={ondblclick} oncontextmenu={oncontextmenu}>
-	<div class="power">{mod.module_socket_type.slice(0, 1)} {matchingSocket ? Math.ceil((mod.module_stat[level]?.module_capacity ?? 0) / 2) : (mod.module_stat[level]?.module_capacity ?? 0)}</div>
+	<div class="power" class:matchingSocket onclick={toggleMatching} ondblclick={nothing}>{mod.module_socket_type.slice(0, 1)} {getModuleDrain(mod, level, matchingSocket)}</div>
 	<div class="name">{mod.module_name}</div>
-	<div class="description">{mod.module_stat[level]?.value}</div>
+	<div class="description">{mod.module_stat[level]?.value ?? ""}</div>
 	{#if mod.module_type !== null}<div>Category: {mod.module_type}</div>{/if}
 	<div>Type: {mod.module_class}</div>
-	{#if showButtons}<button onclick={decrease} ondblclick={nothing}>-</button><button onclick={increase} ondblclick={nothing}>+</button>{/if}
+	{#if interactive}<button onclick={decrease} ondblclick={nothing}>-</button><button onclick={increase} ondblclick={nothing}>+</button>{/if}
 </div>
 
 <style>
@@ -100,6 +112,12 @@
 	{
 		font-size: larger;
 		font-weight: bold;
+		text-shadow: 1px 1px #333333;
+	}
+
+	.matchingSocket
+	{
+		color: lightgreen;
 	}
 
 	.name

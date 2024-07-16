@@ -1,6 +1,6 @@
 <script lang="ts">
     import { CommonEffects } from "./Effects";
-	import { getModuleData, type Module } from "./ModData";
+	import { getModuleData, getModuleDrain, type Module } from "./ModData";
     import ModCard from "./lib/ModCard.svelte";
 
 	const modulesPromise = getModuleData();
@@ -24,10 +24,10 @@
 	{
 		module: Module,
 		level: number,
-		flags: ModFlags
+		isMatching: boolean,
 	};
 
-	let selected: SelectedMod[] = $state([]);
+	let selected = $state([] as SelectedMod[]);
 
 	function initFromBuildCode(code: string)
 	{
@@ -39,16 +39,17 @@
 				const module = modulesData.find((m) => m.module_id === id);
 				if (module)
 				{
-					selected = [...selected, { module, level: parseInt(level ?? "0"), flags: parseInt(flags ?? "0") }];
+					selected = [...selected, { module, level: parseInt(level ?? "0"), isMatching: (parseInt(flags ?? "0") & ModFlags.MatchingSocket) === ModFlags.MatchingSocket }];
 				}
 			});
 	}
 
 	function updateUrl()
 	{
+		const param = `?${buildCode}`;
 		if (isLoaded)
 		{
-			window.history.replaceState(null, '', `?${buildCode}`);
+			window.history.replaceState(null, '', param);
 		}
 	}
 
@@ -56,7 +57,7 @@
 	{
 		if (canSelect(module))
 		{
-			selected = [...selected, { module, level: getMaxLevel(module), flags: ModFlags.None }];
+			selected = [...selected, { module, level: getMaxLevel(module), isMatching: false }];
 		}
 	}
 
@@ -178,8 +179,8 @@
 		return result;
 	}
 
-	const usedCapacity = $derived(selected.reduce((value, mod) => value + (mod.module.module_stat[mod.level]?.module_capacity ?? 0), 0));
-	const buildCode = $derived(selected.map((m) => `${m.module.module_id}:${m.level}:${m.flags}`).join(","));
+	const usedCapacity = $derived(selected.reduce((value, mod) => value + getModuleDrain(mod.module, mod.level, mod.isMatching), 0));
+	const buildCode = $derived(selected.map((m) => `${m.module.module_id}:${m.level}:${m.isMatching ? ModFlags.MatchingSocket : ModFlags.None}`).join(","));
 
 	$effect(updateUrl);
 
@@ -195,7 +196,7 @@
 		<div style="flex: 3" class="loadout-container" ondrop={handleDragDrop} ondragover={handleDragOver}>
 			{#each selected as mod, i (mod.module.module_id)}
 				{#if mod.module}
-					<ModCard showButtons={true} mod={mod.module} bind:level={mod.level}
+					<ModCard interactive={true} mod={mod.module} bind:level={mod.level} bind:matchingSocket={mod.isMatching}
 						ondblclick={(e) => { e.preventDefault(); unselectMod(mod.module); }}
 						oncontextmenu={(e) => { e.preventDefault(); unselectMod(mod.module); }} />
 				{/if}
@@ -245,8 +246,8 @@
 			<div>Showing {filtered.length}</div>
 		</div>
 		<div style="display: flex; flex-wrap: wrap; gap: 10px">
-			{#each filtered as mod}
-				<ModCard {mod} level={100} ondblclick={() => selectMod(mod)} />
+			{#each filtered as mod (mod.module_id)}
+				<ModCard {mod} ondblclick={() => selectMod(mod)} />
 			{/each}
 		</div>
 	{/await}
