@@ -192,7 +192,7 @@
 	<div style="display: flex; justify-content: space-between; align-items: flex-start;">
 
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div style="flex: 5; width: 1020px; height: 550px; border: solid 1px black; display: flex; flex-wrap: wrap; gap: 10px; overflow: scroll" ondrop={handleDragDrop} ondragover={handleDragOver}>
+		<div style="flex: 3" class="loadout-container" ondrop={handleDragDrop} ondragover={handleDragOver}>
 			{#each selected as mod, i (mod.module.module_id)}
 				{#if mod.module}
 					<ModCard showButtons={true} mod={mod.module} bind:level={mod.level}
@@ -202,7 +202,7 @@
 			{/each}
 		</div>
 
-		<div style="flex: 2">
+		<div style="flex: 1">
 			<ul>
 				{#each getStats() as item}
 					<li>{item}</li>
@@ -216,7 +216,7 @@
 		<div>Loading...</div>
 	{:then modules}
 		{@const filtered = filterModules(modules)}
-		<div style="display: flex; flex-wrap: wrap; gap: 10px;">
+		<div class="mod-list">
 			<input type="search" placeholder="Search" bind:value={filter.text} />
 			<select bind:value={filter.class}>
 				<option value="">Class</option>
@@ -254,6 +254,22 @@
 </main>
 
 <style>
+	.loadout-container
+	{
+		display: flex; 
+		flex-wrap: wrap;
+		flex-direction: row;
+		gap: 10px; 
+		min-width: 975px;
+		min-height: 550px;
+		border: solid 1px black;
+	}
 
+	.mod-list
+	{
+		display: flex;
+		flex-wrap: wrap;
+		gap: 10px;
+	}
 
 </style>

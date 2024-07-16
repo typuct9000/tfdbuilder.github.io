@@ -65,6 +65,12 @@
 		}
 	}
 
+	function nothing(e: Event)
+	{
+		e.preventDefault();
+		e.stopPropagation();
+	}
+
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -74,7 +80,7 @@
 	<div class="description">{mod.module_stat[level]?.value}</div>
 	{#if mod.module_type !== null}<div>Category: {mod.module_type}</div>{/if}
 	<div>Type: {mod.module_class}</div>
-	{#if showButtons}<button onclick={decrease}>-</button><button onclick={increase}>+</button>{/if}
+	{#if showButtons}<button onclick={decrease} ondblclick={nothing}>-</button><button onclick={increase} ondblclick={nothing}>+</button>{/if}
 </div>
 
 <style>
