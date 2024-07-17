@@ -90,9 +90,9 @@
 	<div class="power" class:matchingSocket onclick={toggleMatching} ondblclick={nothing}>{mod.module_socket_type.slice(0, 1)} {getModuleDrain(mod, level, matchingSocket)}</div>
 	<div class="name">{mod.module_name}</div>
 	<div class="description">{mod.module_stat[level]?.value ?? ""}</div>
-	{#if mod.module_type !== null}<div>Category: {mod.module_type}</div>{/if}
-	<div>Type: {mod.module_class}</div>
-	{#if interactive}<button onclick={decrease} ondblclick={nothing}>-</button><button onclick={increase} ondblclick={nothing}>+</button>{/if}
+	{#if mod.module_type !== null}<div class="category">{mod.module_type}</div>{/if}
+	<!-- <div>Type: {mod.module_class}</div> -->
+	{#if interactive}<div><button onclick={decrease} ondblclick={nothing}>-</button><button onclick={increase} ondblclick={nothing}>+</button></div>{/if}
 </div>
 
 <style>
@@ -106,6 +106,8 @@
 		width: 150px;
 		min-height: 220px;
 		max-height: 280px;
+		display: flex;
+		flex-direction: column;
 	}
 
 	.power
@@ -130,10 +132,25 @@
 
 	.description
 	{
-		padding: 5px;
-		border-bottom: solid 1px gray;
-		overflow-y: hidden;
+		font-size: small;
+		padding: 0 5px 5px 5px;
+		overflow-y: auto;
 		scrollbar-width: thin;
+		flex: 1;
+	}
+
+	.category
+	{
+		border-top: solid 1px gray;
+		text-align: center;
+	}
+
+	button
+	{
+		width: 30%;
+		height: 20px;
+		padding: 0;
+		margin: 5px;
 	}
 
 </style>

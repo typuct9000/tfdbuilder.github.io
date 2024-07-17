@@ -193,7 +193,7 @@
 	<div style="display: flex; justify-content: space-between; align-items: flex-start;">
 
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div style="flex: 3" class="loadout-container" ondrop={handleDragDrop} ondragover={handleDragOver}>
+		<div style="flex: 4" class="loadout-container" ondrop={handleDragDrop} ondragover={handleDragOver}>
 			{#each selected as mod, i (mod.module.module_id)}
 				{#if mod.module}
 					<ModCard interactive={true} mod={mod.module} bind:level={mod.level} bind:matchingSocket={mod.isMatching}
@@ -261,8 +261,8 @@
 		flex-wrap: wrap;
 		flex-direction: row;
 		gap: 10px; 
-		min-width: 975px;
-		min-height: 550px;
+		min-width: 150px;
+		min-height: 450px;
 		border: solid 1px black;
 	}
 
