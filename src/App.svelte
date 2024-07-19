@@ -1,7 +1,9 @@
 <script lang="ts">
-    import { CommonEffects } from "./Effects";
+    import { fade } from "svelte/transition";
+	import { CommonEffects } from "./Effects";
 	import { getModuleData, getModuleDrain, type Module } from "./ModData";
-    import ModCard from "./lib/ModCard.svelte";
+	import ModCard from "./lib/ModCard.svelte";
+    import ModSlot from "./lib/ModSlot.svelte";
 
 	const modulesPromise = getModuleData();
 	modulesPromise.then(init);
@@ -51,6 +53,14 @@
 		{
 			window.history.replaceState(null, '', param);
 		}
+	}
+
+	let isCopiedShown = $state(false);
+	function copyBuildLink()
+	{
+		navigator.clipboard.writeText(window.location.origin + window.location.pathname + "?" + buildCode);
+		isCopiedShown = true;
+		setTimeout(() => isCopiedShown = false, 1500);
 	}
 
 	function selectMod(module: Module)
@@ -179,6 +189,34 @@
 		return result;
 	}
 
+	function formatValues(values: string[])
+	{
+		if (values.length < 2)
+		{
+			return values.join(", ");
+		}
+
+		let result = 0;
+		let isPercentage = false;
+		for (const item of values)
+		{
+			const matches = item.match(/([+-]?\d+\.?\d+)(%?)/);
+			if (matches)
+			{
+				const [_, value, percent] = matches;
+				if (value)
+				{
+					isPercentage = isPercentage || !!percent;
+					const float = parseFloat(value);
+					result += /*percent ? float / 100 :*/ float;
+				}
+			}
+		}
+
+		//return isPercentage ? `${result >= 0 ? "+" : ""}${result * 100}%` : `${result >= 0 ? "+" : ""}${result}`;
+		return `${result >= 0 ? "+" : ""}${result.toFixed(1)}${isPercentage ? "%" : ""}`;
+	}
+
 	const usedCapacity = $derived(selected.reduce((value, mod) => value + getModuleDrain(mod.module, mod.level, mod.isMatching), 0));
 	const buildCode = $derived(selected.map((m) => `${m.module.module_id}:${m.level}:${m.isMatching ? ModFlags.MatchingSocket : ModFlags.None}`).join(","));
 
@@ -188,27 +226,38 @@
 
 <main>
 
-	<div><a href="{window.location.pathname + "?" + buildCode}">Build link</a> Used capacity: {usedCapacity}</div>
+	<!-- <div><a href="{window.location.pathname + "?" + buildCode}">Build link</a> Used capacity: {usedCapacity}</div> -->
 
-	<div style="display: flex; justify-content: space-between; align-items: flex-start;">
+	<div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 20px">
 
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div style="flex: 4" class="loadout-container" ondrop={handleDragDrop} ondragover={handleDragOver}>
-			{#each selected as mod, i (mod.module.module_id)}
-				{#if mod.module}
-					<ModCard interactive={true} mod={mod.module} bind:level={mod.level} bind:matchingSocket={mod.isMatching}
-						ondblclick={(e) => { e.preventDefault(); unselectMod(mod.module); }}
-						oncontextmenu={(e) => { e.preventDefault(); unselectMod(mod.module); }} />
-				{/if}
-			{/each}
+		<div style="flex: 4; max-width: 980px;">
+
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div class="loadout-container" ondrop={handleDragDrop} ondragover={handleDragOver}>
+				{#each Array.from<SelectedMod|undefined>({...selected, length: 12}) as mod, i (mod?.module.module_id ?? i)}
+					{#if mod?.module}
+						<ModCard interactive={true} mod={mod.module} bind:level={mod.level} bind:matchingSocket={mod.isMatching}
+							ondblclick={(e) => { e.preventDefault(); unselectMod(mod.module); }}
+							oncontextmenu={(e) => { e.preventDefault(); unselectMod(mod.module); }} />
+					{:else}
+						<ModSlot />
+					{/if}
+				{/each}
+			</div>
+
 		</div>
 
 		<div style="flex: 1">
-			<ul>
-				{#each getStats() as item}
-					<li>{item}</li>
+
+			<button title="Copy link to this build to clipboard" onclick={copyBuildLink}>Copy Build Link</button> {#if isCopiedShown}<span style="position: absolute; margin: 10px 10px;" out:fade>Copied!</span>{/if}
+
+			<p>Used capacity: {usedCapacity}</p>
+
+			<div class="mod-stats">
+				{#each getStats() as [name, values] (name)}
+					<li>{name} {formatValues(values)}</li>
 				{/each}
-			</ul>
+			</div>
 		</div>
 
 	</div>
@@ -217,8 +266,8 @@
 		<div>Loading...</div>
 	{:then modules}
 		{@const filtered = filterModules(modules)}
-		<div class="mod-list">
-			<input type="search" placeholder="Search" bind:value={filter.text} />
+		<div class="filter-list">
+			<input type="search" title="Search in titles and description. Accepts Regural Expressions" placeholder="Search" bind:value={filter.text} />
 			<select bind:value={filter.class}>
 				<option value="">Class</option>
 				{#each getFilterOptions(modules, "module_class") as option}
@@ -245,7 +294,7 @@
 			</select>
 			<div>Showing {filtered.length}</div>
 		</div>
-		<div style="display: flex; flex-wrap: wrap; gap: 10px">
+		<div class="mod-list">
 			{#each filtered as mod (mod.module_id)}
 				<ModCard {mod} ondblclick={() => selectMod(mod)} />
 			{/each}
@@ -262,8 +311,16 @@
 		flex-direction: row;
 		gap: 10px; 
 		min-width: 150px;
+		max-width: 980px;
 		min-height: 450px;
-		border: solid 1px black;
+	}
+
+	.filter-list
+	{
+		display: flex;
+		flex-wrap: wrap;
+		gap: 10px;
+		margin-bottom: 10px;
 	}
 
 	.mod-list
@@ -272,5 +329,23 @@
 		flex-wrap: wrap;
 		gap: 10px;
 	}
+
+	.mod-stats
+	{
+		list-style-type: none;
+		/* font-size: 90%; */
+	}
+
+	.mod-stats li
+	{
+		background: lightgray;
+		padding: 2px 5px;
+		margin-bottom: 5px;
+	}
+
+	/* .mod-stats li:nth-child(odd)
+	{
+		background: gray;
+	} */
 
 </style>

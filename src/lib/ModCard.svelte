@@ -99,6 +99,7 @@
 	.modcard
 	{
 		font-size: small;
+		text-align: center;
 		color: white;
 		border: solid 2px;
 		border-radius: 10px;
