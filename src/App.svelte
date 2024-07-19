@@ -226,8 +226,6 @@
 
 <main>
 
-	<!-- <div><a href="{window.location.pathname + "?" + buildCode}">Build link</a> Used capacity: {usedCapacity}</div> -->
-
 	<div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 20px">
 
 		<div style="flex: 4; max-width: 980px;">
@@ -347,5 +345,12 @@
 	{
 		background: gray;
 	} */
+
+	@media (prefers-color-scheme: dark) {
+		.mod-stats li
+		{
+			background: #666666;
+		}
+	}
 
 </style>
