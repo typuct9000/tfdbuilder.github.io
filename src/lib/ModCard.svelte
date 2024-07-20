@@ -128,12 +128,13 @@
 		font-size: medium;
 		font-weight: bold;
 		text-shadow: 1px 1px #333333;
-		padding: 0 5px 5px 5px;
+		padding: 0 5px 8px 5px;
 	}
 
 	.description
 	{
 		font-size: small;
+		line-height: normal;
 		padding: 0 5px 5px 5px;
 		overflow-y: auto;
 		scrollbar-width: thin;

@@ -200,7 +200,7 @@
 		let isPercentage = false;
 		for (const item of values)
 		{
-			const matches = item.match(/([+-]?\d+\.?\d+)(%?)/);
+			const matches = item.match(/([+-]?\d+(?:\.\d+)?)(%?)/);
 			if (matches)
 			{
 				const [_, value, percent] = matches;
@@ -210,6 +210,10 @@
 					const float = parseFloat(value);
 					result += /*percent ? float / 100 :*/ float;
 				}
+			}
+			else
+			{
+				console.warn(`Couldn't parse mod value ${item}`);
 			}
 		}
 
@@ -349,7 +353,7 @@
 	@media (prefers-color-scheme: dark) {
 		.mod-stats li
 		{
-			background: #666666;
+			background: #333333;
 		}
 	}
 
