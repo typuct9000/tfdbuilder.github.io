@@ -62,4 +62,18 @@ export const CommonEffects =
     "Explosive ATK",
     "Max High-Power Rounds",
     "Shell Capacity",
-];
+
+] as const;
+
+
+export type CommonStat = typeof CommonEffects[number];
+
+
+export type StatValue =
+{
+    value: number,
+    isPercentage: boolean,
+    toString(): string
+};
+
+export type Stats = Map<CommonStat, StatValue>;

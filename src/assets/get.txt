@@ -1,0 +1,2 @@
+https://open.api.nexon.com/static/tfd/meta/en/module.json
+https://open.api.nexon.com/static/tfd/meta/en/stat.json

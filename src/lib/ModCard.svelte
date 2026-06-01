@@ -7,20 +7,20 @@
 
 	const colors: Record<string, string[]> = 
 	{
-		"Standard": ["#2B5F89", "#53B7F7"],
-		"Rare": ["#6B4888", "#D487F5"],
-		"Ultimate": ["#7C7147", "#F7DB78"],
-		"Transcendent": ["#ab574e", "#ff7c70"]
+		/*"Standard"*/ "Tier1": ["#2B5F89", "#53B7F7"],
+		/*"Rare"*/ "Tier2": ["#6B4888", "#D487F5"],
+		/*"Ultimate"*/ "Tier3": ["#7C7147", "#F7DB78"],
+		/*"Transcendent"*/ "Tier4": ["#ab574e", "#ff7c70"]
 	};
 
 	function getBorderColor()
 	{
-		return colors[mod.module_tier]?.[1] ?? "black";
+		return colors[mod.module_tier_id]?.[1] ?? "black";
 	}
 
 	function getBackgroundColor()
 	{
-		return colors[mod.module_tier]?.[0] ?? "white";
+		return colors[mod.module_tier_id]?.[0] ?? "white";
 	}
 
 
@@ -83,11 +83,16 @@
 		}
 	}
 
+	function formatNewlines(text: string)
+	{
+		return text.replaceAll("\r\n", "<br/>");
+	}
+
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="modcard" style="background-color: {getBackgroundColor()}; border-color: {getBorderColor()}; " draggable="true" ondragstart={handleDragStart} ondblclick={ondblclick} oncontextmenu={oncontextmenu}>
-	<div class="power" class:matchingSocket onclick={toggleMatching} ondblclick={nothing}>{mod.module_socket_type.slice(0, 1)} {getModuleDrain(mod, level, matchingSocket)}</div>
+	<div class="power" class:matchingSocket onclick={toggleMatching} ondblclick={nothing}>{mod.module_socket_type?.slice(0, 1) ?? ""} {getModuleDrain(mod, level, matchingSocket)}</div>
 	<div class="name">{mod.module_name}</div>
 	<div class="description">{mod.module_stat[level]?.value ?? ""}</div>
 	{#if mod.module_type !== null}<div class="category">{mod.module_type}</div>{/if}
@@ -106,7 +111,7 @@
 		padding-bottom: 5px;
 		width: 150px;
 		min-height: 220px;
-		max-height: 280px;
+		max-height: 220px;
 		display: flex;
 		flex-direction: column;
 	}

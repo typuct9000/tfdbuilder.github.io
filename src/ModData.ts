@@ -1,6 +1,6 @@
 export async function getModuleData()
 {
-	const { default: data } = await import("./assets/module.json", { assert: { type: "json" } });
+	const { default: data } = await import("./assets/module.json");
 	return data;
 }
 

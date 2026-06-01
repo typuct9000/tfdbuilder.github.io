@@ -1,9 +1,10 @@
 <script lang="ts">
     import { fade } from "svelte/transition";
-	import { CommonEffects } from "./Effects";
+	import { CommonEffects, type CommonStat, type Stats, type StatValue } from "./Effects";
 	import { getModuleData, getModuleDrain, type Module } from "./ModData";
 	import ModCard from "./lib/ModCard.svelte";
     import ModSlot from "./lib/ModSlot.svelte";
+    import WeaponCalc from "./lib/WeaponCalc.svelte";
 
 	const modulesPromise = getModuleData();
 	modulesPromise.then(init);
@@ -16,11 +17,13 @@
 		initFromBuildCode(window.location.search.slice(1));
 	}
 
-	enum ModFlags
+	const ModFlags = 
 	{
-		None = 0,
-		MatchingSocket = 1
-	};
+		None: 0,
+		MatchingSocket: 1,
+	} as const;
+
+	type ModFlags = typeof ModFlags[keyof typeof ModFlags];
 
 	type SelectedMod = 
 	{
@@ -30,6 +33,7 @@
 	};
 
 	let selected = $state([] as SelectedMod[]);
+	let stats = $derived(parseStats(selected));
 
 	function initFromBuildCode(code: string)
 	{
@@ -134,22 +138,23 @@
 		const after = modules.filter((m) =>
 			(!textFilter || textFilter.test(m.module_name) || textFilter.test(m.module_stat.at(-1)?.value ?? "")) &&
 			(filter.class === "" || m.module_class === filter.class) &&
-			(filter.tier === "" || m.module_tier === filter.tier) &&
+			(filter.tier === "" || m.module_tier_id === filter.tier) &&
 			(filter.type === "" || m.module_type === filter.type) &&
 			(filter.socket === "" || m.module_socket_type === filter.socket));
 		return after;
 	}
 
-	function getFilterOptions(modules: Module[], key: keyof Pick<Module, "module_class" | "module_socket_type" | "module_tier" | "module_type">)
+	function getFilterOptions(modules: Module[], key: keyof Pick<Module, "module_class" | "module_socket_type" | "module_tier_id" | "module_type">)
 	{
 		const options = new Set<string>();
 		modules.forEach((mod) => { if (mod[key]) options.add(mod[key]); });
 		return options;
 	}
 
-	function getStats()
+	function parseStats(selected: SelectedMod[])
 	{
-		const result = new Map<string, string[]>();
+		const statValuesRaw = new Map<CommonStat, string[]>();
+		const otherEffects = new Set<string>();
 		for (const mod of selected)
 		{
 			const description = mod.module.module_stat[mod.level]?.value;
@@ -158,19 +163,30 @@
 				const effects = parseModDescription(description);
 				for (const effect of Object.keys(effects))
 				{
-					if (CommonEffects.includes(effect))
+					if (isKnownEffect(effect))
 					{
-						result.set(effect, [...result.get(effect) ?? [], effects[effect]!]);
+						statValuesRaw.set(effect as CommonStat, [...statValuesRaw.get(effect as CommonStat) ?? [], effects[effect] ?? ""]);
 					}
 					else
 					{
-						result.set(description, []);
+						otherEffects.add(description);
 					}
 				}
 			}
 		}
 
-		return result;
+		const stats = new Map<CommonStat, StatValue>();
+		for (const [name, values] of statValuesRaw)
+		{
+			stats.set(name, parseValues(values));
+		}
+
+		return { stats, effects: otherEffects };
+	}
+
+	function isKnownEffect(name: string)
+	{
+		return (CommonEffects as unknown as string[]).includes(name);
 	}
 
 	function parseModDescription(description: string)
@@ -189,13 +205,8 @@
 		return result;
 	}
 
-	function formatValues(values: string[])
+	function parseValues(values: string[]): StatValue
 	{
-		if (values.length < 2)
-		{
-			return values.join(", ");
-		}
-
 		let result = 0;
 		let isPercentage = false;
 		for (const item of values)
@@ -206,7 +217,7 @@
 				const [_, value, percent] = matches;
 				if (value)
 				{
-					isPercentage = isPercentage || !!percent;
+					isPercentage = isPercentage || Boolean(percent);
 					const float = parseFloat(value);
 					result += /*percent ? float / 100 :*/ float;
 				}
@@ -217,8 +228,25 @@
 			}
 		}
 
-		//return isPercentage ? `${result >= 0 ? "+" : ""}${result * 100}%` : `${result >= 0 ? "+" : ""}${result}`;
-		return `${result >= 0 ? "+" : ""}${result.toFixed(1)}${isPercentage ? "%" : ""}`;
+		return { value: result, isPercentage, toString: function() { return `${this.value >= 0 ? "+" : ""}${this.value.toFixed(1)}${this.isPercentage ? "%" : ""}`; }};
+	}
+
+	const InvertedStats =
+	[
+		"Skill Cooldown",
+		"Skill Cost",
+		"Recoil",
+
+	] as const;
+
+	function isInverted(name: CommonStat)
+	{
+		return InvertedStats.includes(name as typeof InvertedStats[number]);
+	}
+
+	function sorted(stats: Stats)
+	{
+		return [...stats.entries()].sort((a, b) => Math.abs(b[1].value) - Math.abs(a[1].value));
 	}
 
 	const usedCapacity = $derived(selected.reduce((value, mod) => value + getModuleDrain(mod.module, mod.level, mod.isMatching), 0));
@@ -230,128 +258,175 @@
 
 <main>
 
-	<div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 20px">
+	<div class="loadout-column">
 
-		<div style="flex: 4; max-width: 980px;">
+		<div style="display: flex; flex-direction: row; gap: 10px; margin-bottom: 15px">
 
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<div class="loadout-container" ondrop={handleDragDrop} ondragover={handleDragOver}>
-				{#each Array.from<SelectedMod|undefined>({...selected, length: 12}) as mod, i (mod?.module.module_id ?? i)}
-					{#if mod?.module}
-						<ModCard interactive={true} mod={mod.module} bind:level={mod.level} bind:matchingSocket={mod.isMatching}
-							ondblclick={(e) => { e.preventDefault(); unselectMod(mod.module); }}
-							oncontextmenu={(e) => { e.preventDefault(); unselectMod(mod.module); }} />
-					{:else}
-						<ModSlot />
-					{/if}
-				{/each}
-			</div>
+			<select style="flex: 1;">
+				<optgroup label="Descendant">
+					<option>Ajax</option>
+				</optgroup>
+				<optgroup label="Weapon">
+					<option>Eternal Willpower</option>
+				</optgroup>
+			</select>
+
+			<input type="text" placeholder="Description" style="flex: 10; border: none;" />
 
 		</div>
 
-		<div style="flex: 1">
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="loadout-container" ondrop={handleDragDrop} ondragover={handleDragOver}>
+			{#each Array.from<SelectedMod|undefined>({...selected, length: 12}) as mod, i (mod?.module.module_id ?? i)}
+				{#if mod?.module}
+					<ModCard interactive={true} mod={mod.module} bind:level={mod.level} bind:matchingSocket={mod.isMatching}
+						ondblclick={(e) => { e.preventDefault(); unselectMod(mod.module); }}
+						oncontextmenu={(e) => { e.preventDefault(); unselectMod(mod.module); }} />
+				{:else}
+					<ModSlot />
+				{/if}
+			{/each}
+		</div>
 
-			<button title="Copy link to this build to clipboard" onclick={copyBuildLink}>Copy Build Link</button> {#if isCopiedShown}<span style="position: absolute; margin: 10px 10px;" out:fade>Copied!</span>{/if}
-
-			<p>Used capacity: {usedCapacity}</p>
-
-			<div class="mod-stats">
-				{#each getStats() as [name, values] (name)}
-					<li>{name} {formatValues(values)}</li>
+		{#await modulesPromise}
+			<div>Loading...</div>
+		{:then modules}
+			{@const filtered = filterModules(modules)}
+			<div class="flex-flow filter-list" style="margin: 10px 0;">
+				<input type="search" title="Search in titles and description. Accepts Regural Expressions" placeholder="Search" bind:value={filter.text} />
+				<select bind:value={filter.class}>
+					<option value="">Class</option>
+					{#each getFilterOptions(modules, "module_class") as option}
+						<option>{option}</option>
+					{/each}
+				</select>
+				<select bind:value={filter.tier}>
+					<option value="">Rarity</option>
+					{#each getFilterOptions(modules, "module_tier_id") as option}
+						<option>{option}</option>
+					{/each}
+				</select>
+				<select bind:value={filter.type}>
+					<option value="">Category</option>
+					{#each getFilterOptions(modules, "module_type") as option}
+						<option>{option}</option>
+					{/each}
+				</select>
+				<select bind:value={filter.socket}>
+					<option value="">Socket</option>
+					{#each getFilterOptions(modules, "module_socket_type") as option}
+						<option>{option}</option>
+					{/each}
+				</select>
+				<div>Showing {filtered.length}</div>
+			</div>
+			<div class="mod-list">
+				{#each filtered as mod (mod.module_id)}
+					<ModCard {mod} ondblclick={() => selectMod(mod)} />
 				{/each}
 			</div>
-		</div>
+		{/await}
 
 	</div>
 
-	{#await modulesPromise}
-		<div>Loading...</div>
-	{:then modules}
-		{@const filtered = filterModules(modules)}
-		<div class="filter-list">
-			<input type="search" title="Search in titles and description. Accepts Regural Expressions" placeholder="Search" bind:value={filter.text} />
-			<select bind:value={filter.class}>
-				<option value="">Class</option>
-				{#each getFilterOptions(modules, "module_class") as option}
-					<option>{option}</option>
-				{/each}
-			</select>
-			<select bind:value={filter.tier}>
-				<option value="">Rarity</option>
-				{#each getFilterOptions(modules, "module_tier") as option}
-					<option>{option}</option>
-				{/each}
-			</select>
-			<select bind:value={filter.type}>
-				<option value="">Category</option>
-				{#each getFilterOptions(modules, "module_type") as option}
-					<option>{option}</option>
-				{/each}
-			</select>
-			<select bind:value={filter.socket}>
-				<option value="">Socket</option>
-				{#each getFilterOptions(modules, "module_socket_type") as option}
-					<option>{option}</option>
-				{/each}
-			</select>
-			<div>Showing {filtered.length}</div>
-		</div>
-		<div class="mod-list">
-			{#each filtered as mod (mod.module_id)}
-				<ModCard {mod} ondblclick={() => selectMod(mod)} />
+	<div class="stats-column">
+
+		<button title="Copy link to this build to clipboard" onclick={copyBuildLink}>Copy Build Link</button> {#if isCopiedShown}<span style="position: absolute; margin: 10px 10px;" out:fade>Copied!</span>{/if}
+
+		<p>Used capacity: {usedCapacity}</p>
+
+		<div class="mod-stats">
+			{#each sorted(stats.stats) as [name, value] (name)}
+				<li>{name} {value.toString()}</li>
+			{/each}
+			{#each stats.effects as effect}
+				<li>{effect}</li>
 			{/each}
 		</div>
-	{/await}
+
+		<WeaponCalc stats={stats.stats} />
+
+	</div>
+
+	
 
 </main>
 
 <style>
-	.loadout-container
+	main
 	{
-		display: flex; 
-		flex-wrap: wrap;
-		flex-direction: row;
-		gap: 10px; 
-		min-width: 150px;
-		max-width: 980px;
-		min-height: 450px;
+		display: flex;
+		gap: 10px;
 	}
 
-	.filter-list
+	.loadout-column
+	{
+		min-width: 150px;
+		max-width: 980px;
+		flex: 2 1 980px;
+	}
+
+	.stats-column
+	{
+		flex: 1 2 450px;
+	}
+
+	.flex-flow
 	{
 		display: flex;
 		flex-wrap: wrap;
+		flex-direction: row;
 		gap: 10px;
-		margin-bottom: 10px;
+	}
+
+	.loadout-container
+	{
+		min-width: 150px;
+		max-width: 980px;
+		min-height: 450px;
+
+		display: grid;
+		grid-template-columns: repeat(auto-fit, 150px);
+		column-gap: 14px;
+		row-gap: 10px;
+
+		margin-bottom: 20px;
+	}
+
+	.loadout-container > *
+	{
+		grid-column: 1 / -1;
 	}
 
 	.mod-list
 	{
-		display: flex;
-		flex-wrap: wrap;
-		gap: 10px;
+		min-width: 150px;
+		display: grid;
+		grid-template-columns: repeat(auto-fit, 150px);
+		column-gap: 14px;
+		row-gap: 10px;
 	}
 
-	.mod-stats
+	.stats-column
 	{
 		list-style-type: none;
 		/* font-size: 90%; */
 	}
 
-	.mod-stats li
+	.stats-column li
 	{
 		background: lightgray;
 		padding: 2px 5px;
 		margin-bottom: 5px;
 	}
 
-	/* .mod-stats li:nth-child(odd)
+	/* .stats-column li:nth-child(odd)
 	{
 		background: gray;
 	} */
 
 	@media (prefers-color-scheme: dark) {
-		.mod-stats li
+		.stats-column li
 		{
 			background: #333333;
 		}
